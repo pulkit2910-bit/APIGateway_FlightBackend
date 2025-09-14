@@ -18,6 +18,7 @@ func SetupRouter(handler handler.HandlerInterface) *gin.Engine {
 	})
 
 	router.POST("/signup", handler.SignUpHandler)
+	router.POST("/signin", handler.SignInHandler)
 
 	return router
 }
