@@ -1,4 +1,4 @@
-package handler
+package handlers
 
 import (
 	service "apigateway/internal/services"
@@ -16,6 +16,7 @@ type Handler struct {
 type HandlerInterface interface {
 	SignUpHandler(ctx *gin.Context)
 	SignInHandler(ctx *gin.Context)
+	ProxyRequestHandler(ctx *gin.Context)
 }
 
 func (h *Handler) SignUpHandler(ctx *gin.Context) {
@@ -42,6 +43,8 @@ func (h *Handler) SignUpHandler(ctx *gin.Context) {
 		return
 	}
 
+	fmt.Println("coming here")
+
 	resp, err := h.service.SignUp(payload)
 	if err != nil {
 		fmt.Printf("Error calling auth service: %+v\n", err)
@@ -49,6 +52,8 @@ func (h *Handler) SignUpHandler(ctx *gin.Context) {
 		return
 	}
 	defer resp.Body.Close()
+
+	fmt.Printf("response : %+v", resp)
 
 	ctx.Status(resp.StatusCode)
 	ctx.Writer.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
@@ -94,6 +99,10 @@ func (h *Handler) SignInHandler(ctx *gin.Context) {
 	if _, copyErr := io.Copy(ctx.Writer, resp.Body); copyErr != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read auth service response"})
 	}
+}
+
+func (h *Handler) ProxyRequestHandler(ctx *gin.Context) {
+
 }
 
 func NewHandler(service service.ServiceInterface) HandlerInterface {

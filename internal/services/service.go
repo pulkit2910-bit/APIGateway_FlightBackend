@@ -1,7 +1,8 @@
-package service
+package services
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 )
 
@@ -29,6 +30,9 @@ func (s *Service) SignUp(payload []byte) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+
+	fmt.Printf("req: %+v\n", req)
+
 	return s.HTTPClient.Do(req)
 }
 
