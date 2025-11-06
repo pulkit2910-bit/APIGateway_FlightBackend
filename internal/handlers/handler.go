@@ -2,6 +2,7 @@ package handlers
 
 import (
 	service "apigateway/internal/services"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -43,22 +44,50 @@ func (h *Handler) SignUpHandler(ctx *gin.Context) {
 		return
 	}
 
-	fmt.Println("coming here")
-
 	resp, err := h.service.SignUp(payload)
 	if err != nil {
 		fmt.Printf("Error calling auth service: %+v\n", err)
-		ctx.JSON(http.StatusBadGateway, gin.H{"error": "auth service error"})
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": err, "message": "auth service error"})
 		return
 	}
 	defer resp.Body.Close()
-
-	fmt.Printf("response : %+v", resp)
 
 	ctx.Status(resp.StatusCode)
 	ctx.Writer.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
 	if _, copyErr := io.Copy(ctx.Writer, resp.Body); copyErr != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read auth service response"})
+	}
+
+	// Configure rate limiter for the new user
+	var signUpResp struct {
+        Data    interface{} `json:"data"`
+        Success bool        `json:"success"`
+        Message string      `json:"message"`
+        Err     interface{} `json:"err"`
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&signUpResp); err != nil {
+        ctx.JSON(http.StatusBadGateway, gin.H{"error": err, "message": "invalid response from auth service"})
+        return
+    }
+
+	// create payload for rate limiter
+	// TODO: handle constants
+	rateLimiterPayload := map[string]interface{}{
+		"userId": signUpResp.Data,
+		"capacity": "10",
+		"refillRate": "1000",
+	}
+	payloadBytes, err := json.Marshal(rateLimiterPayload)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err,"message": "failed to create rate limiter payload"})
+		return
+	}
+
+	_, err = h.service.ConfigRateLimiter(payloadBytes)
+	if err != nil {
+		fmt.Printf("Error calling rate limiter service: %+v\n", err)
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": err, "message": "rate limiter service error"})
+		return
 	}
 }
 

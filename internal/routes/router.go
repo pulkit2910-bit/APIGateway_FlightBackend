@@ -4,6 +4,7 @@ import (
 	handler "apigateway/internal/handlers"
 	"apigateway/internal/middlewares"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,12 +19,14 @@ func SetupRouter(handler handler.HandlerInterface) *gin.Engine {
 		})
 	})
 
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+
 	// Forward request to Authentication Service
 	router.POST("/signup", handler.SignUpHandler)
 	router.POST("/signin", handler.SignInHandler)
 
 	protected := router.Group("/")
-    protected.Use(middlewares.JWTAuthenticate(), middlewares.RateLimitCheck())
+    protected.Use(middlewares.JWTAuthenticate(httpClient), middlewares.RateLimitCheck(httpClient))
     {
         // Catch-all route for all methods (GET, POST, PUT, DELETE, PATCH, etc.)
         protected.Any("/service/*proxyPath", handler.ProxyRequestHandler)

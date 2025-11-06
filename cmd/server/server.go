@@ -14,13 +14,9 @@ import (
 )
 
 func Start() {
-	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
-	if authServiceURL == "" {
-		authServiceURL = "http://localhost:3001/api/v1"
-	}
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 
-	service := service.NewService(authServiceURL, httpClient)
+	service := service.NewService(httpClient)
 	handler := handler.NewHandler(service)
 	r := router.SetupRouter(handler)
 
