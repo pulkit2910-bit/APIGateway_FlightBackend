@@ -5,9 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v3"
 )
 
 type Handler struct {
@@ -19,6 +24,18 @@ type HandlerInterface interface {
 	SignInHandler(ctx *gin.Context)
 	ProxyRequestHandler(ctx *gin.Context)
 }
+
+type Route struct {
+	Prefix  string `yaml:"prefix"`
+	Service string `yaml:"service"`
+	Port    int    `yaml:"port"`
+}
+
+type Config struct {
+	Routes []Route `yaml:"routes"`
+}
+
+var routeConfig Config
 
 func (h *Handler) SignUpHandler(ctx *gin.Context) {
 	var req struct {
@@ -130,8 +147,58 @@ func (h *Handler) SignInHandler(ctx *gin.Context) {
 	}
 }
 
-func (h *Handler) ProxyRequestHandler(ctx *gin.Context) {
+func loadRoutes() {
+	data, err := ioutil.ReadFile("/config/routes.yaml")
+	if err != nil {
+		fmt.Printf("failed to read routes config: %v", err)
+		return
+	}
+	if err := yaml.Unmarshal(data, &routeConfig); err != nil {
+		fmt.Printf("failed to parse routes.yaml: %v", err)
+	}
+}
 
+func (h *Handler) ProxyRequestHandler(ctx *gin.Context) {
+    loadRoutes()
+
+    path := ctx.Request.RequestURI
+	for _, rt := range routeConfig.Routes {
+		if strings.HasPrefix(path, "/api"+rt.Prefix) {
+			proxyToService(ctx, rt)
+			return
+		}
+	} 
+}
+
+func proxyToService(ctx *gin.Context, rt Route) {
+	targetURL := fmt.Sprintf("http://%s.default.svc.cluster.local:%d", rt.Service, rt.Port)
+	target, _ := url.Parse(targetURL)
+
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+
+		req.Host = target.Host
+
+        originalPath := ctx.Request.URL.Path
+        req.URL.Path = strings.TrimPrefix(originalPath, "/api"+rt.Prefix)
+        if req.URL.Path == "" {
+            req.URL.Path = "/"
+        }
+
+        req.URL.RawQuery = ctx.Request.URL.RawQuery
+        req.Header.Set("X-Forwarded-Host", ctx.Request.Host)
+        req.Header.Set("X-Real-IP", ctx.ClientIP())
+	}
+
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+        fmt.Printf("proxy error: %v", err)
+        ctx.JSON(http.StatusBadGateway, gin.H{"error": "upstream service unavailable"})
+    }
+
+	proxy.ServeHTTP(ctx.Writer, ctx.Request)
 }
 
 func NewHandler(service service.ServiceInterface) HandlerInterface {
