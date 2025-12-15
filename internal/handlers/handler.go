@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -148,7 +148,7 @@ func (h *Handler) SignInHandler(ctx *gin.Context) {
 }
 
 func loadRoutes() {
-	data, err := ioutil.ReadFile("/config/routes.yaml")
+	data, err := os.ReadFile("/etc/config/routes.yaml")
 	if err != nil {
 		fmt.Printf("failed to read routes config: %v", err)
 		return
