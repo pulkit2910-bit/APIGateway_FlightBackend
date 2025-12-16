@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"apigateway/config"
 	service "apigateway/internal/services"
 	"encoding/json"
 	"fmt"
@@ -25,17 +26,7 @@ type HandlerInterface interface {
 	ProxyRequestHandler(ctx *gin.Context)
 }
 
-type Route struct {
-	Prefix  string `yaml:"prefix"`
-	Service string `yaml:"service"`
-	Port    int    `yaml:"port"`
-}
-
-type Config struct {
-	Routes []Route `yaml:"routes"`
-}
-
-var routeConfig Config
+var routeConfig config.Config
 
 func (h *Handler) SignUpHandler(ctx *gin.Context) {
 	var req struct {
@@ -170,7 +161,7 @@ func (h *Handler) ProxyRequestHandler(ctx *gin.Context) {
 	} 
 }
 
-func proxyToService(ctx *gin.Context, rt Route) {
+func proxyToService(ctx *gin.Context, rt config.Route) {
 	targetURL := fmt.Sprintf("http://%s.default.svc.cluster.local:%d", rt.Service, rt.Port)
 	target, _ := url.Parse(targetURL)
 

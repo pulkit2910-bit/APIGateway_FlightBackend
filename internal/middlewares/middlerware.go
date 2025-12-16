@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var secretKey = []byte("khjfkasdhfkaioqwerfmckjshfkajwkef")
 var rateLimiterServiceURL = "http://localhost:8080"
 var authServiceURL = "http://localhost:3001"
 
